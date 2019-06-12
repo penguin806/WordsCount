@@ -92,6 +92,29 @@ void parseInputString(_In_ char *inputString, _Inout_ struct list_head *wordList
     free(wordBuffer);
 }
 
+void dumpWordOfHighestAppearTimesAndDeleteFromList(_Inout_ struct list_head *wordList,
+        _Out_ WORD_INFO_NODE *highestAppearTimesWordNode)
+{
+    unsigned maxWordAppearTimes = 0;
+    struct list_head *pTemp, *pHighestTag = NULL;
+    WORD_INFO_NODE *pHighestNode = NULL;
+
+    list_for_each(pTemp, wordList)
+    {
+        WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
+
+        if(pNode->wordAppearTimes > maxWordAppearTimes)
+        {
+            maxWordAppearTimes = pNode->wordAppearTimes;
+            pHighestTag = pTemp;
+            pHighestNode = pNode;
+        }
+    }
+
+    memcpy(highestAppearTimesWordNode, pHighestNode, sizeof(WORD_INFO_NODE));   // Dump
+    list_del(pHighestTag);
+}
+
 void printWordsList(_In_ struct list_head *wordList)
 {
     const unsigned functionWordsTableSize = 6;
@@ -101,15 +124,15 @@ void printWordsList(_In_ struct list_head *wordList)
     unsigned functionWordsCount = 0;
 
     puts("WORD        \t\t\tTIMES");
-    struct list_head *pTemp;
-    list_for_each(pTemp, wordList)
+    while(false == list_empty(wordList))
     {
-        bool isFunctionWord = false;
-        WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
+        WORD_INFO_NODE *pHighestNode = malloc(sizeof(WORD_INFO_NODE));
+        dumpWordOfHighestAppearTimesAndDeleteFromList(wordList, pHighestNode);
 
+        bool isFunctionWord = false;
         for(int i=0; i<functionWordsTableSize; i++)
         {
-            if(strcmp(functionWordsTable[i],pNode->wordCharactors) == 0)
+            if(strcmp(functionWordsTable[i],pHighestNode->wordCharactors) == 0)
             {
                 isFunctionWord = true;
                 functionWordsCount++;
@@ -118,8 +141,10 @@ void printWordsList(_In_ struct list_head *wordList)
 
         if(!isFunctionWord)
         {
-            printf("%-12s\t\t\t%d\n", pNode->wordCharactors, pNode->wordAppearTimes);
+            printf("%-12s\t\t\t%d\n", pHighestNode->wordCharactors, pHighestNode->wordAppearTimes);
         }
+
+        free(pHighestNode);
     }
 
     if(functionWordsCount)
