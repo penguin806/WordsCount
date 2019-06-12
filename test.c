@@ -1,6 +1,8 @@
 //
-// Created by snow on Jun 13rd, 2019.
+// Created by snow on Jun 13th, 2019.
+// https://github.com/penguin806/WordsCount.git
 //
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "list.h"

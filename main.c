@@ -1,5 +1,6 @@
 //
-// Created by snow on Jun 13rd, 2019.
+// Created by snow on Jun 13th, 2019.
+// https://github.com/penguin806/WordsCount.git
 //
 
 #include <stdio.h>
@@ -69,11 +70,11 @@ void parseInputString(_In_ char *inputString, _Inout_ struct list_head *wordList
 
     while(*pInputStr)
     {
-        if(*pInputStr != ' ' && *pInputStr != '\t' && *pInputStr != '\n')
+        if(*pInputStr != ' ' && *pInputStr != '\t' && *pInputStr != '\n' && *pInputStr != ',' && *pInputStr != '.')
         {
             memset(wordBuffer, 0, WORD_BUFFER_SIZE);
             char *pWordBuf = wordBuffer;
-            while(*pInputStr && *pInputStr != ' ' && *pInputStr != '\t' && *pInputStr != '\n')
+            while(*pInputStr && *pInputStr != ' ' && *pInputStr != '\t' && *pInputStr != '\n' && *pInputStr != ',' && *pInputStr != '.')
             {
                 // Extract word
                 *pWordBuf = *pInputStr;
@@ -93,12 +94,37 @@ void parseInputString(_In_ char *inputString, _Inout_ struct list_head *wordList
 
 void printWordsList(_In_ struct list_head *wordList)
 {
-    puts("WORD\t\tTIMES");
+    const unsigned functionWordsTableSize = 6;
+    const char* functionWordsTable[] = {
+        "the", "a", "an", "of", "at", "in"
+    };
+    unsigned functionWordsCount = 0;
+
+    puts("WORD        \t\t\tTIMES");
     struct list_head *pTemp;
     list_for_each(pTemp, wordList)
     {
+        bool isFunctionWord = false;
         WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
-        printf("%-4s\t\t%d\n", pNode->wordCharactors, pNode->wordAppearTimes);
+
+        for(int i=0; i<functionWordsTableSize; i++)
+        {
+            if(strcmp(functionWordsTable[i],pNode->wordCharactors) == 0)
+            {
+                isFunctionWord = true;
+                functionWordsCount++;
+            }
+        }
+
+        if(!isFunctionWord)
+        {
+            printf("%-12s\t\t\t%d\n", pNode->wordCharactors, pNode->wordAppearTimes);
+        }
+    }
+
+    if(functionWordsCount)
+    {
+        printf("%-12s\t\t\t%d\n", "FUNCTION_WORD", functionWordsCount);
     }
 }
 
@@ -107,7 +133,7 @@ int main()
     char *inputBuffer = malloc(INPUT_BUFFER_SIZE); //1MByte
     LIST_HEAD(wordList);
 
-    gets(inputBuffer);
+    fgets(inputBuffer, INPUT_BUFFER_SIZE, stdin);
     parseInputString(inputBuffer, &wordList);
     printWordsList(&wordList);
 
