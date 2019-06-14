@@ -9,10 +9,10 @@
 #include <stdbool.h>
 #include "list.h"
 // https://gist.github.com/roychen/1710968
-// @kazutomo 他把内核的list.h移植到了用户模式 Thanks
+// @kazutomo 把内核的list.h移植到了用户模式 Thanks!
 
 
-#define _In_	// SAL (Microsoft source code annotation language) 微软的注解 习惯加上它 函数输入输出更加清晰
+#define _In_	// SAL (Microsoft source code annotation language) 微软注解 习惯加上它 使函数输入输出更加清晰
 #define _Out_	// _In_ -> 这是一个输入参数   _Out_ -> 输出参数   _Inout_ -> 输入输出
 #define _Inout_
 
@@ -21,23 +21,23 @@
 
 struct word_info{					// 链表节点 存储每个词的信息
     char *wordCharactors;			// 单词字母们
-    unsigned wordAppearTimes;		// 出现次数
-    struct list_head internalList;	// 2条小尾巴 internalList.prev连接上个节点尾巴(internalList) internalList.next连接下个节点尾巴(internalList)
+    unsigned wordAppearTimes;		// 它的出现次数
+    struct list_head internalList;	// 2条小尾巴 internalList.prev连接上个节点的尾巴(internalList) internalList.next连下个节点尾巴
 };
 typedef struct word_info WORD_INFO_NODE; // WORD_INFO_NODE  <==>  struct word_info
 
-// ↓看看链表里有没有这个单词 (即是否重复)
+// ↓看看链表里有没有这个单词 (是否重复)
 // @theWord: 待检查单词
-// @wordList: 存放很多很多单词的链表
+// @wordList: 存放着很多很多单词的链表
 bool checkIfWordExist(_In_ const char *theWord, _In_ struct list_head *wordList)
 {
     struct list_head *pTemp;
-	// 内核list.h提供list_for_each宏 大幅简化遍历链表步骤
+	// 内核list.h提供list_for_each工具 大幅简化遍历链表步骤
 	// 假设链表wordList现在有10个节点 将循环10次 每个节点的internalList自动传给形参pTemp
     list_for_each(pTemp, wordList)
     {
-		// 传来的pTemp是节点内internalList 但我们想要的 是节点内的wordCharactors与wordAppearTimes 怎么办?
-		// 没问题 我们有list_entry宏 (根据偏移值 自动计算出节点的首地址pNode)  再pNode->wordCharactors pNode->wordAppearTimes  OKla
+		// 传来的pTemp是节点内internalList 但我们想要的 是节点的wordCharactors与wordAppearTimes 怎么办?
+		// 没问题 我们有list_entry (根据偏移值 自动计算出节点首地址pNode)  再pNode->wordCharactors pNode->wordAppearTimes  OKla
         WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
         if(strcmp(theWord, pNode->wordCharactors) == 0)	// strcmp(A,B) 若A=B返回0 -> 这单词 链表里面有个和它长的一模一样
         {
@@ -49,7 +49,7 @@ bool checkIfWordExist(_In_ const char *theWord, _In_ struct list_head *wordList)
     return false;   // 不重复!
 }
 
-// ↓把一个单词放进单词链表
+// ↓将某个单词放进单词链表
 // @theWord: 待存储单词
 // @wordList: 很多很多单词的链表
 void appendWordToWordsList(_In_ char *theWord, _Inout_ struct list_head *wordList)
@@ -100,7 +100,7 @@ void parseInputString(_In_ char *inputString, _Inout_ struct list_head *wordList
             memset(wordBuffer, 0, WORD_BUFFER_SIZE);
             char *pWordBuf = wordBuffer;
 
-			// 程序跑呀跑 遇到空格、制表符、换行、逗号或句号 停下来
+			// 程序跑呀跑 遇到了空格、制表符、换行、逗号或句号 停下来
 			// "Wow,YinHongai is amazing."
 			//     ^
             while(*pInputStr && *pInputStr != ' ' && *pInputStr != '\t' && *pInputStr != '\n' && *pInputStr != ',' && *pInputStr != '.')
@@ -134,14 +134,14 @@ void dumpWordOfHighestAppearTimesAndDeleteFromList(_Inout_ struct list_head *wor
     struct list_head *pTemp, *pHighestTag = NULL;
     WORD_INFO_NODE *pHighestNode = NULL;
 
-	// 找呀找
+	// 找呀找...
     list_for_each(pTemp, wordList)
     {
         WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
 
         if(pNode->wordAppearTimes > maxWordAppearTimes)
         {
-			// 诶 找到一个重复次数比maxWordAppearTimes高 记下来
+			// 找到一个重复次数比maxWordAppearTimes高的 记下来
             maxWordAppearTimes = pNode->wordAppearTimes;
             pHighestTag = pTemp;
             pHighestNode = pNode;
@@ -168,8 +168,8 @@ void printWordsList(_In_ struct list_head *wordList)
     unsigned functionWordsCount = 0;
 
 	// 老师要求按频率从高到低排序输出
-	// 我的思路: 	每次输出频率最大节点 并删掉它
-	//				当链表节点一个不剩 输出完毕
+	// 我的思路:  每次输出频率最大节点 并删掉它
+	//            当链表节点一个不剩 输出完毕
     puts("WORD        \t\t\tTIMES");
 	// 链表空了没?
     while(false == list_empty(wordList))
@@ -193,7 +193,7 @@ void printWordsList(_In_ struct list_head *wordList)
 		// 不是!
         if(!isFunctionWord)
         {
-			// 输出这个最高节点
+			// 输出这个节点
             printf("%-12s\t\t\t%d\n", pHighestNode->wordCharactors, pHighestNode->wordAppearTimes);
         }
 
@@ -223,7 +223,7 @@ void printWordsList(_In_ struct list_head *wordList)
 *        /,_|  |   /,_/   /
 *           /,_/      '`-'
 *
-*    Hi~ 小仙女 程序入口点在这儿 ↓
+*    Hi 小仙女 程序入口点在这儿~ ↓
 ***/
 
 int main()
