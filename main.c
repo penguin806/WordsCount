@@ -123,7 +123,7 @@ void printWordsList(_In_ struct list_head *wordList)
     };
     unsigned functionWordsCount = 0;
 
-    puts("WORD        \t\t\tTIMES");
+    puts("WORD                \t\t\tTIMES");
     while(false == list_empty(wordList))
     {
         WORD_INFO_NODE *pHighestNode = malloc(sizeof(WORD_INFO_NODE));
@@ -141,7 +141,7 @@ void printWordsList(_In_ struct list_head *wordList)
 
         if(!isFunctionWord)
         {
-            printf("%-12s\t\t\t%d\n", pHighestNode->wordCharactors, pHighestNode->wordAppearTimes);
+            printf("%-20s\t\t\t%d\n", pHighestNode->wordCharactors, pHighestNode->wordAppearTimes);
         }
 
         free(pHighestNode);
@@ -149,7 +149,7 @@ void printWordsList(_In_ struct list_head *wordList)
 
     if(functionWordsCount)
     {
-        printf("%-12s\t\t\t%d\n", "FUNCTION_WORD", functionWordsCount);
+        printf("%-20s\t\t\t%d\n", "FUNCTION_WORD", functionWordsCount);
     }
 }
 
@@ -158,7 +158,20 @@ int main()
     char *inputBuffer = malloc(INPUT_BUFFER_SIZE); //1MByte
     LIST_HEAD(wordList);
 
-    fgets(inputBuffer, INPUT_BUFFER_SIZE, stdin);
+//    fgets(inputBuffer, INPUT_BUFFER_SIZE, stdin);
+    char *pInputBuffer = inputBuffer;
+    while(pInputBuffer < inputBuffer + INPUT_BUFFER_SIZE - 1)
+    {
+        char singleChar = fgetc(stdin);
+        if(EOF == singleChar)
+        {
+            break;
+        }
+        *pInputBuffer = singleChar;
+        pInputBuffer++;
+    }
+    *pInputBuffer = 0;
+
     parseInputString(inputBuffer, &wordList);
     printWordsList(&wordList);
 
