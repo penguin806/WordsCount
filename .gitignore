@@ -11,3 +11,6 @@ CTestTestfile.cmake
 # CLion
 .idea/
 cmake-build-*/
+
+#VSCode
+.vscode/

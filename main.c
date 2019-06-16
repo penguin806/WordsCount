@@ -13,7 +13,7 @@
 #define _Out_
 #define _Inout_
 
-#define INPUT_BUFFER_SIZE 1024000
+#define INPUT_BUFFER_SIZE 1048576
 #define WORD_BUFFER_SIZE 512
 
 struct word_info{
