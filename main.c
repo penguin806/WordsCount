@@ -6,179 +6,84 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <ctype.h>
 #include <getopt.h>
-#include "list.h"
 
-#define _In_
-#define _Out_
-#define _Inout_
+#define LIST_POISON1  ((void *) 0x00100100)
+#define LIST_POISON2  ((void *) 0x00200200)
 
-struct word_info{
-	char *wordCharactors;
-	unsigned wordAppearTimes;
-	struct list_head internalList;
+struct list_head {
+	struct list_head *next, *prev;
 };
-typedef struct word_info WORD_INFO_NODE;
 
-bool checkIfWordsAreSameIgnoreCase(_In_ char *wordA, _In_ char *wordB)
+#define LIST_HEAD_INIT(name) { &(name), &(name) }
+
+#define LIST_HEAD(name) \
+	struct list_head name = LIST_HEAD_INIT(name)
+
+#define INIT_LIST_HEAD(ptr) do { \
+	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
+} while (0)
+
+#define list_for_each(pos, head) \
+  for (pos = (head)->next; pos != (head);	\
+       pos = pos->next)
+
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+
+#define container_of(ptr, type, member) ({                      \
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+        (type *)( (char *)__mptr - offsetof(type,member) );})
+
+#define list_entry(ptr, type, member) \
+	container_of(ptr, type, member)
+
+static inline void __list_add(struct list_head *new,
+                              struct list_head *prev,
+                              struct list_head *next)
 {
-	char *pA = wordA;
-	char *pB = wordB;
-
-	while (*pA && *pB)
-	{
-		if(tolower(*pA) != tolower(*pB))
-		{
-			return false;
-		}
-		pA++;
-		pB++;
-	}
-
-	if(*pA || *pB)
-	{
-		return false;
-	} else {
-		return true;
-	}
+	next->prev = new;
+	new->next = next;
+	new->prev = prev;
+	prev->next = new;
 }
 
-bool checkIfWordExist(_In_ char *theWord, _In_ struct list_head *wordList)
+static inline void list_add_tail(struct list_head *new, struct list_head *head)
 {
-	struct list_head *pTemp;
-	list_for_each(pTemp, wordList)
-	{
-		WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
-		if(checkIfWordsAreSameIgnoreCase(theWord, pNode->wordCharactors))
-		{
-			pNode->wordAppearTimes++;   // Word already exists in list
-			return true;
-		}
-	}
-
-	return false;   // Word not exists in list
+	__list_add(new, head->prev, head);
 }
 
-void appendWordToWordsList(_In_ char *theWord, _Inout_ struct list_head *wordList)
+static inline void __list_del(struct list_head * prev, struct list_head * next)
 {
-	bool bWordExists = checkIfWordExist(theWord, wordList);
-	if(true == bWordExists)
-	{
-		return;
-	}
-
-	char *newWordBuffer = malloc(strlen(theWord) + 1);
-	strcpy(newWordBuffer, theWord);
-
-	WORD_INFO_NODE *pWordInfo;
-	pWordInfo = malloc(sizeof(WORD_INFO_NODE));
-	pWordInfo->wordCharactors = newWordBuffer;
-	pWordInfo->wordAppearTimes = 1;
-	INIT_LIST_HEAD(&pWordInfo->internalList);
-	list_add_tail(&pWordInfo->internalList, wordList);
+	next->prev = prev;
+	prev->next = next;
 }
 
-void parseInputString(_In_ char *inputString, _In_ const int inputBufferSize, _Inout_ struct list_head *wordList)
+static inline void list_del(struct list_head *entry)
 {
-	if(inputBufferSize <= 0)
-	{
-		return;
-	}
-	char *pInputStr = inputString;
-	char *wordBuffer = malloc(inputBufferSize);
-
-	while(*pInputStr == ' ' || *pInputStr == '\t' || *pInputStr == '\n')
-	{
-		pInputStr++; // Skip blank of the beginning
-	}
-
-	while(*pInputStr && pInputStr < inputString + inputBufferSize)
-	{
-		// if the character is NOT 'space' or 'tab' or 'newLine' or any 'punctuationCharacter'
-		if(!isspace(*pInputStr) && !ispunct(*pInputStr))
-		{
-			memset(wordBuffer, 0, inputBufferSize);
-			char *pWordBuf = wordBuffer;
-			while(*pInputStr && pInputStr < inputString + inputBufferSize && !isspace(*pInputStr) && !ispunct(*pInputStr))
-			{
-				// Extract word
-				*pWordBuf = *pInputStr;
-				pWordBuf++;
-				pInputStr++;
-			}
-
-			*pWordBuf = '\0';
-			appendWordToWordsList(wordBuffer, wordList);
-		} else {
-			pInputStr++;
-		}
-	}
-
-	free(wordBuffer);
+	__list_del(entry->prev, entry->next);
+	entry->next = LIST_POISON1;
+	entry->prev = LIST_POISON2;
 }
 
-void dumpWordOfHighestAppearTimesAndDeleteFromList(_Inout_ struct list_head *wordList,
-                                                   _Out_ WORD_INFO_NODE *highestAppearTimesWordNode)
+static inline int list_empty(const struct list_head *head)
 {
-	unsigned maxWordAppearTimes = 0;
-	struct list_head *pTemp, *pHighestTag = NULL;
-	WORD_INFO_NODE *pHighestNode = NULL;
-
-	list_for_each(pTemp, wordList)
-	{
-		WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
-
-		if(pNode->wordAppearTimes > maxWordAppearTimes)
-		{
-			maxWordAppearTimes = pNode->wordAppearTimes;
-			pHighestTag = pTemp;
-			pHighestNode = pNode;
-		}
-	}
-
-	memcpy(highestAppearTimesWordNode, pHighestNode, sizeof(WORD_INFO_NODE));   // Dump
-	list_del(pHighestTag);
+	return head->next == head;
 }
 
-void printWordsList(_In_ struct list_head *wordList, _In_ FILE *outputFileHandle)
-{
-	const unsigned functionWordsTableSize = 6;
-	const char* functionWordsTable[] = {
-			"the", "a", "an", "of", "at", "in"
-	};
-	unsigned functionWordsCount = 0;
+typedef struct node{
+	char *pattern;
+	int count;
+	struct list_head myList;
+} LIST_NODE;
 
-	fputs("WORD                \t\t\tTIMES\n", outputFileHandle);
-	while(false == list_empty(wordList))
-	{
-		WORD_INFO_NODE *pHighestNode = malloc(sizeof(WORD_INFO_NODE));
-		dumpWordOfHighestAppearTimesAndDeleteFromList(wordList, pHighestNode);
 
-		bool isFunctionWord = false;
-		for(int i=0; i<functionWordsTableSize; i++)
-		{
-			if( checkIfWordsAreSameIgnoreCase((char *)functionWordsTable[i], pHighestNode->wordCharactors) )
-			{
-				isFunctionWord = true;
-				functionWordsCount++;
-			}
-		}
 
-		if(!isFunctionWord)
-		{
-			fprintf(outputFileHandle, "%-20s\t\t\t%d\n", pHighestNode->wordCharactors, pHighestNode->wordAppearTimes);
-		}
 
-		free(pHighestNode);
-	}
 
-	if(functionWordsCount)
-	{
-		fprintf(outputFileHandle, "%-20s\t\t\t%d\n", "FUNCTION_WORD", functionWordsCount);
-	}
-}
+
+void extractWord(char *inputString, const int inputBufferSize, struct list_head *wordList);
+void outputResult(struct list_head *list, FILE *outputFileHandle);
 
 int main(int argc, char *argv[])
 {
@@ -216,7 +121,6 @@ int main(int argc, char *argv[])
 	}
 
 	FILE *pInputFile = fopen(inputFilePath, "r");
-//    FILE *pInputFile = fopen("test.txt", "r");
 	FILE *pOutputFile = fopen(outputFilePath, "w");
 	if(!pInputFile)
 	{
@@ -243,9 +147,155 @@ int main(int argc, char *argv[])
 
 	LIST_HEAD(wordList);
 
-	parseInputString(inputBuffer, inputBufferSize, &wordList);
-	printWordsList(&wordList, pOutputFile);
+	extractWord(inputBuffer, inputBufferSize, &wordList);
+	outputResult(&wordList, pOutputFile);
 
 	free(inputBuffer);
 	return 0;
+}
+
+int compareWords_IgnoreCase(char *wordA, char *wordB)
+{
+	char *pA = wordA;
+	char *pB = wordB;
+
+	while (*pA && *pB)
+	{
+		if(tolower(*pA) != tolower(*pB))
+		{
+			return 0;
+		}
+		pA++;
+		pB++;
+	}
+
+	if(*pA || *pB)
+	{
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+int isInList(char *word, struct list_head *list)
+{
+	struct list_head *item;
+	list_for_each(item, list)
+	{
+		LIST_NODE *pNode = list_entry(item, LIST_NODE, myList);
+		if(compareWords_IgnoreCase(word, pNode->pattern))
+		{
+			pNode->count++;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+void addWord(char *word, struct list_head *list)
+{
+	int check = isInList(word, list);
+	if(1 == check)
+	{
+		return;
+	}
+
+	char *buffer = malloc(strlen(word) + 1);
+	strcpy(buffer, word);
+
+	LIST_NODE *pWordInfo;
+	pWordInfo = malloc(sizeof(LIST_NODE));
+	pWordInfo->pattern = buffer;
+	pWordInfo->count = 1;
+	INIT_LIST_HEAD(&pWordInfo->myList);
+	list_add_tail(&pWordInfo->myList, list);
+}
+
+void extractWord(char *inputString, const int inputBufferSize, struct list_head *wordList)
+{
+	if(inputBufferSize <= 0)
+	{
+		return;
+	}
+	char *pInputStr = inputString;
+	char *space = malloc(inputBufferSize);
+
+	while(*pInputStr && pInputStr < inputString + inputBufferSize)
+	{
+		// if the character is NOT 'space' or 'tab' or 'newLine' or any 'punctuationCharacter'
+		if(!isspace(*pInputStr) && !ispunct(*pInputStr))
+		{
+			memset(space, 0, inputBufferSize);
+			char *pWordBuf = space;
+			while(*pInputStr && pInputStr < inputString + inputBufferSize && !isspace(*pInputStr) && !ispunct(*pInputStr))
+			{
+				*pWordBuf = *pInputStr;
+				pWordBuf++;
+				pInputStr++;
+			}
+
+			*pWordBuf = '\0';
+			addWord(space, wordList);
+		} else {
+			pInputStr++;
+		}
+	}
+
+	free(space);
+}
+
+void dumpWord(struct list_head *list, LIST_NODE *node)
+{
+	unsigned highest = 0;
+	struct list_head *pTemp, *pHighestTag = NULL;
+	LIST_NODE *pHighestNode = NULL;
+
+	list_for_each(pTemp, list)
+	{
+		LIST_NODE *pNode = list_entry(pTemp, LIST_NODE, myList);
+
+		if(pNode->count > highest)
+		{
+			highest = pNode->count;
+			pHighestTag = pTemp;
+			pHighestNode = pNode;
+		}
+	}
+
+	memcpy(node, pHighestNode, sizeof(LIST_NODE));
+	list_del(pHighestTag);
+}
+
+void outputResult(struct list_head *list, FILE *outputFileHandle)
+{
+	const unsigned functionWordsTableSize = 6;
+	const char* functionWordsTable[] = {
+			"the", "a", "an", "of", "at", "in"
+	};
+	unsigned functionWordsCount = 0;
+
+	fputs("PATTERN             \t\t\tCOUNT\n", outputFileHandle);
+	while(0 == list_empty(list))
+	{
+		LIST_NODE *pHighestNode = malloc(sizeof(LIST_NODE));
+		dumpWord(list, pHighestNode);
+
+		int isFunctionWord = 0;
+		for(int i=0; i<functionWordsTableSize; i++)
+		{
+			if(compareWords_IgnoreCase((char *) functionWordsTable[i], pHighestNode->pattern) )
+			{
+				isFunctionWord = 1;
+				functionWordsCount++;
+			}
+		}
+
+		if(!isFunctionWord)
+		{
+			fprintf(outputFileHandle, "%-20s\t\t\t%d\n", pHighestNode->pattern, pHighestNode->count);
+		}
+
+		free(pHighestNode);
+	}
 }
