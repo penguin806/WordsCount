@@ -8,14 +8,12 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <getopt.h>
 #include "list.h"
 
 #define _In_
 #define _Out_
 #define _Inout_
-
-#define INPUT_BUFFER_SIZE 1048576
-#define WORD_BUFFER_SIZE 512
 
 struct word_info{
     char *wordCharactors;
@@ -82,24 +80,28 @@ void appendWordToWordsList(_In_ char *theWord, _Inout_ struct list_head *wordLis
     list_add_tail(&pWordInfo->internalList, wordList);
 }
 
-void parseInputString(_In_ char *inputString, _Inout_ struct list_head *wordList)
+void parseInputString(_In_ char *inputString, _In_ const int inputBufferSize, _Inout_ struct list_head *wordList)
 {
+	if(inputBufferSize <= 0)
+	{
+		return;
+	}
     char *pInputStr = inputString;
-    char *wordBuffer = malloc(WORD_BUFFER_SIZE); // 0.5KByte
+    char *wordBuffer = malloc(inputBufferSize);
 
     while(*pInputStr == ' ' || *pInputStr == '\t' || *pInputStr == '\n')
     {
         pInputStr++; // Skip blank of the beginning
     }
 
-    while(*pInputStr)
+    while(*pInputStr && pInputStr < inputString + inputBufferSize)
     {
         // if the character is NOT 'space' or 'tab' or 'newLine' or any 'punctuationCharacter'
         if(!isspace(*pInputStr) && !ispunct(*pInputStr))
         {
-            memset(wordBuffer, 0, WORD_BUFFER_SIZE);
+            memset(wordBuffer, 0, inputBufferSize);
             char *pWordBuf = wordBuffer;
-            while(*pInputStr && !isspace(*pInputStr) && !ispunct(*pInputStr))
+            while(*pInputStr && pInputStr < inputString + inputBufferSize && !isspace(*pInputStr) && !ispunct(*pInputStr))
             {
                 // Extract word
                 *pWordBuf = *pInputStr;
@@ -140,7 +142,7 @@ void dumpWordOfHighestAppearTimesAndDeleteFromList(_Inout_ struct list_head *wor
     list_del(pHighestTag);
 }
 
-void printWordsList(_In_ struct list_head *wordList)
+void printWordsList(_In_ struct list_head *wordList, _In_ FILE *outputFileHandle)
 {
     const unsigned functionWordsTableSize = 6;
     const char* functionWordsTable[] = {
@@ -148,7 +150,7 @@ void printWordsList(_In_ struct list_head *wordList)
     };
     unsigned functionWordsCount = 0;
 
-    puts("WORD                \t\t\tTIMES");
+    fputs("WORD                \t\t\tTIMES\n", outputFileHandle);
     while(false == list_empty(wordList))
     {
         WORD_INFO_NODE *pHighestNode = malloc(sizeof(WORD_INFO_NODE));
@@ -166,7 +168,7 @@ void printWordsList(_In_ struct list_head *wordList)
 
         if(!isFunctionWord)
         {
-            printf("%-20s\t\t\t%d\n", pHighestNode->wordCharactors, pHighestNode->wordAppearTimes);
+            fprintf(outputFileHandle, "%-20s\t\t\t%d\n", pHighestNode->wordCharactors, pHighestNode->wordAppearTimes);
         }
 
         free(pHighestNode);
@@ -174,31 +176,75 @@ void printWordsList(_In_ struct list_head *wordList)
 
     if(functionWordsCount)
     {
-        printf("%-20s\t\t\t%d\n", "FUNCTION_WORD", functionWordsCount);
+        fprintf(outputFileHandle, "%-20s\t\t\t%d\n", "FUNCTION_WORD", functionWordsCount);
     }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    char *inputBuffer = malloc(INPUT_BUFFER_SIZE); //1MByte
-    LIST_HEAD(wordList);
+    char *inputFilePath = NULL;
+    char *outputFilePath = NULL;
 
-//    fgets(inputBuffer, INPUT_BUFFER_SIZE, stdin);
-    char *pInputBuffer = inputBuffer;
-    while(pInputBuffer < inputBuffer + INPUT_BUFFER_SIZE - 1)
+    int optionIndex = 0;
+    struct option longOptions[] = {
+            {"input", required_argument, NULL, 'i'},
+            {"output", required_argument, NULL, 'o'},
+            {0,0,0,0}
+    };
+    const char *shortOptionString = "i:o:";
+
+    while (1)
     {
-        char singleChar = fgetc(stdin);
-        if(EOF == singleChar)
+        int singleChar = getopt_long(argc, argv, shortOptionString, longOptions, &optionIndex);
+        if( singleChar == -1)
         {
             break;
         }
-        *pInputBuffer = singleChar;
-        pInputBuffer++;
-    }
-    *pInputBuffer = 0;
 
-    parseInputString(inputBuffer, &wordList);
-    printWordsList(&wordList);
+        switch (singleChar)
+        {
+            case 'i':
+                inputFilePath = optarg;
+                break;
+            case 'o':
+                outputFilePath = optarg;
+                break;
+            default:
+                printf("Usage: %s -i <InputFile> -o <OutputFile>\n", argv[0]);
+                return 1;
+        }
+    }
+
+    FILE *pInputFile = fopen(inputFilePath, "r");
+//    FILE *pInputFile = fopen("test.txt", "r");
+    FILE *pOutputFile = fopen(outputFilePath, "w");
+    if(!pInputFile)
+    {
+        puts("Error: unable to access InputFile.");
+        return -1;
+    }
+    if(!pOutputFile)
+    {
+        puts("Error: create OutputFile failed.");
+        return -2;
+    }
+
+    // Get size of InputFile
+    fseek(pInputFile, 0, SEEK_END);
+    const int inputFileSize = ftell(pInputFile);
+    fseek(pInputFile, 0, SEEK_SET);
+
+    // Allocate memory equals to InputFile size
+    const int inputBufferSize = inputFileSize + 1;
+    char *inputBuffer = malloc(inputBufferSize);
+    // Read entire InputFile and fill info inputBuffer
+    fread(inputBuffer, inputFileSize, 1, pInputFile);
+    *(inputBuffer + inputBufferSize - 1) = 0;
+
+    LIST_HEAD(wordList);
+
+    parseInputString(inputBuffer, inputBufferSize, &wordList);
+    printWordsList(&wordList, pOutputFile);
 
     free(inputBuffer);
     return 0;
