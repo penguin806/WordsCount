@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include "list.h"
 
 #define _In_
@@ -23,13 +24,36 @@ struct word_info{
 };
 typedef struct word_info WORD_INFO_NODE;
 
-bool checkIfWordExist(_In_ const char *theWord, _In_ struct list_head *wordList)
+bool checkIfWordsAreSameIgnoreCase(_In_ char *wordA, _In_ char *wordB)
+{
+    char *pA = wordA;
+    char *pB = wordB;
+
+    while (*pA && *pB)
+    {
+        if(tolower(*pA) != tolower(*pB))
+        {
+            return false;
+        }
+        pA++;
+        pB++;
+    }
+
+    if(*pA || *pB)
+    {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+bool checkIfWordExist(_In_ char *theWord, _In_ struct list_head *wordList)
 {
     struct list_head *pTemp;
     list_for_each(pTemp, wordList)
     {
         WORD_INFO_NODE *pNode = list_entry(pTemp, WORD_INFO_NODE, internalList);
-        if(strcmp(theWord, pNode->wordCharactors) == 0)
+        if(checkIfWordsAreSameIgnoreCase(theWord, pNode->wordCharactors))
         {
             pNode->wordAppearTimes++;   // Word already exists in list
             return true;
@@ -70,11 +94,12 @@ void parseInputString(_In_ char *inputString, _Inout_ struct list_head *wordList
 
     while(*pInputStr)
     {
-        if(*pInputStr != ' ' && *pInputStr != '\t' && *pInputStr != '\n' && *pInputStr != ',' && *pInputStr != '.')
+        // if the character is NOT 'space' or 'tab' or 'newLine' or any 'punctuationCharacter'
+        if(!isspace(*pInputStr) && !ispunct(*pInputStr))
         {
             memset(wordBuffer, 0, WORD_BUFFER_SIZE);
             char *pWordBuf = wordBuffer;
-            while(*pInputStr && *pInputStr != ' ' && *pInputStr != '\t' && *pInputStr != '\n' && *pInputStr != ',' && *pInputStr != '.')
+            while(*pInputStr && !isspace(*pInputStr) && !ispunct(*pInputStr))
             {
                 // Extract word
                 *pWordBuf = *pInputStr;
@@ -132,7 +157,7 @@ void printWordsList(_In_ struct list_head *wordList)
         bool isFunctionWord = false;
         for(int i=0; i<functionWordsTableSize; i++)
         {
-            if(strcmp(functionWordsTable[i],pHighestNode->wordCharactors) == 0)
+            if( checkIfWordsAreSameIgnoreCase((char *)functionWordsTable[i], pHighestNode->wordCharactors) )
             {
                 isFunctionWord = true;
                 functionWordsCount++;
